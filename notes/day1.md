@@ -1,4 +1,4 @@
-# Day 1：Tiny 模型与最小前向传播
+﻿# Day 1：Tiny 模型与最小前向传播
 
 - 对应分支：`learn/day1-model-overview`
 - 对应实验：`experiments/01_tiny_forward.py`
@@ -21,6 +21,14 @@
 
 默认计算：`head_dim = hidden_size // num_attention_heads = 128 // 4 = 32`
 
+### 1.1 `num_hidden_layers` 的作用
+
+- 含义：模型堆叠的 **Transformer Block（MiniMindBlock）数量**。Tiny 配置为 2，表示输入依次穿过 2 个 Block。
+- 源码对应：`self.layers = nn.ModuleList([MiniMindBlock(l, config) for l in range(self.num_hidden_layers)])`，forward 里逐个执行。
+- 每个 Block：RMSNorm → Attention → 残差；RMSNorm → MLP → 残差。**Block 不改变形状**，`[B,T,C]` 进去还是 `[B,T,C]` 出来，改变的是表示内容。
+- 层数越多：容量越大、能建模更复杂的抽象层级，但参数更多、训练更慢，也更容易梯度消失（连乘路径变长）。
+- Tiny 用 2 层是为了学习方便；`MiniMindConfig` 默认 8 层（hidden 768），真实 `minimind-3`（64M）也是 8 层（dim=768、q_heads=8、kv_heads=4）。
+- 实验验证：`len(model.model.layers)` 应等于 2；`model.model.layers[0]` 是第一个 Block 的 attention。
 ### 2. `*args` 与 `**kwargs`
 
 - 在函数**定义**中：`*args` 收集位置参数为 tuple，`**kwargs` 收集关键字参数为 dict。
@@ -79,3 +87,4 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 - 能不看资料说出 Tiny 配置里每个字段的含义；
 - 能解释为什么要 `logits[..., :-1, :]` 与 `labels[..., 1:]` 对齐；
 - 补上 `sys.path` 修复后，01 脚本可以运行并打印 logits/loss/参数量。
+

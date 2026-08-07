@@ -1,4 +1,4 @@
-# Day 4：完整 Attention（手工串联 + 概念验收）
+﻿# Day 4：完整 Attention（手工串联 + 概念验收）
 
 - 对应分支：`learn/day4-attention-complete`
 - 对应实验：`experiments/04_manual_attention.py`（AI 生成，作为参考答案）；`experiments/04_my_manual_attention.py`（待自己手写，当前为空文件）
@@ -73,21 +73,71 @@ o_proj 后:         [2, 6, 128]
 
 ## 遇到的问题与答案
 
-### 1. 为什么除以 `sqrt(head_dim)`？
+### 1. 为什么除以 `sqrt(head_dim)`？（数学推导）
 
-点积是 D 个独立零均值项的和，方差可加：
+目的（先记住）：让 Attention Score 的尺度不随 head_dim 变化，防止 Softmax 饱和 → 梯度消失。
+
+假设 Q、K 的每个维度独立、均值 0、方差 σ²（随机初始化时成立）。点积是 D 个乘积项之和：
 
 ```text
-Var(dot) = D·σ⁴  →  标准差 ∝ √D
+s = q₁k₁ + q₂k₂ + ... + q_D·k_D
 ```
 
-所以分数尺度随 D 增大。除以 `√D` 让分数标准差不随 D 变化（保持 O(1)），防止 Softmax 过尖锐 → 饱和 → 梯度消失。
+第一步，看单个乘积项 `qᵢkᵢ`：
 
-注意不要除以 D：`Var(dot/D) = σ⁴/D`，D 越大分数越挤在 0 附近，Softmax 输出趋近均匀分布，注意力失去区分能力。
+```text
+E[qᵢkᵢ] = E[qᵢ]·E[kᵢ] = 0          （独立 + 零均值）
+Var(qᵢkᵢ) = E[(qᵢkᵢ)²] = E[qᵢ²]·E[kᵢ²] = σ²·σ² = σ⁴
+```
 
+每个维度贡献的方差是常数 σ⁴，与 D 无关。
+
+第二步，独立随机变量之和的方差可加：
+
+```text
+Var(s) = Var(q₁k₁) + Var(q₂k₂) + ... + Var(q_D·k_D) = D·σ⁴
+```
+
+所以：
+
+```text
+标准差 std(s) = √D·σ²   （随 √D 增长）
+```
+
+第三步，比较两种缩放（注意 Var(cX) = c²·Var(X)）：
+
+```text
+除以 √D：Var(s/√D) = D·σ⁴ / (√D)² = σ⁴        → 常数，尺度不随 D 变
+除以 D：  Var(s/D)  = D·σ⁴ / D² = σ⁴/D        → 趋近 0，分数全挤在 0 附近
+```
+
+除以 D 的后果：Softmax 输入几乎全相等 → 输出退化为均匀分布 → 注意力失去区分能力。除以 D 的常见错误是少算了一个平方（把 Var(cX)=c²Var(X) 当成了 cVar(X)）。
+
+直觉（中心极限定理）：D 个独立零均值项的和，典型波动量级是 √D，所以"和"的自然尺度是 √D；除以 √D 是把波动量级归一化到 O(1)。
+
+实测（q、k ~ N(0,1)，σ⁴=1）：D=4 → var 4.0；D=64 → var 64.1；D=256 → var 256.6；var/D ≈ 1，std ≈ √D。
 ### 2. 为什么 Softmax 用 `dim=-1`？
 
-`scores` 的形状是 **`[B,H,T,T]`**（QKᵀ 之后），不是 `[B,T,H,D]`！最后一维是 Key 的维度。每个 Query token 需要在所有可见 Key 之间分配权重，所以沿最后一维归一化，保证每行和为 1。
+先确认形状：`scores` 是 QKᵀ 之后的结果，形状是 **`[B,H,T,T]`**，不是 `[B,T,H,D]`（那是 Q/K/V 拆头后的形状）。最后两个 T 分别是 Query 数和 Key 数。
+
+`dim=-1` 就是最后一个维度 = **Key 维度**。沿它归一化的含义：对每个 Query token（固定 batch、head、query 位置），在它能看到的所有 Key 之间分配权重：
+
+```text
+p[q, k] = exp(s[q, k]) / Σ_{k'} exp(s[q, k'])
+```
+
+保证每个 Query 的权重行和为 1。
+
+为什么不能沿其他维度：
+
+```text
+dim=0（batch）：不同样本之间不该竞争权重
+dim=1（head）：每个头独立学习各自的关注模式
+dim=2（query）：每个 query 独立分配权重，不该跨 query 归一化
+dim=3（key）：唯一语义正确
+```
+
+数字例子：一行分数 `[1.0, 2.0, -inf, -inf]`，沿 dim=-1 做 Softmax ≈ `[0.269, 0.731, 0, 0]`，和为 1；被 Causal Mask 置为 `-inf` 的未来位置恰好变成 0。
 
 ### 3. 为什么 Attention Weight 要乘 V？
 
@@ -135,6 +185,37 @@ sys.stdout.reconfigure(encoding='utf-8')
 - Softmax 饱和时导数 `p(1-p) → 0`，是注意力里梯度消失的典型来源。
 - 缓解：残差连接、归一化、`÷√head_dim`、梯度裁剪、ReLU 等。
 
+
+### 9. Softmax 输出对输入的导数为什么是 p(1−p)？
+
+Softmax 的输入是向量 `z = [z₁, ..., z_K]`，输出是向量 `p = [p₁, ..., p_K]`，所以导数是一张 K×K 的矩阵（Jacobian），不是单个数字：
+
+```text
+对角线（j = i）：     ∂p_i/∂z_i = p_i(1 − p_i)
+非对角线（j ≠ i）：   ∂p_i/∂z_j = −p_i·p_j
+```
+
+推导（商法则）：记 `p_i = e^{z_i} / S`，`S = Σ_j e^{z_j}`，且 `dS/dz_i = e^{z_i} = p_i·S`：
+
+```text
+∂p_i/∂z_i = (e^{z_i}·S − e^{z_i}·e^{z_i}) / S²
+           = p_i − p_i²
+           = p_i(1 − p_i)
+```
+
+p(1−p) 在 p=0.5 时最大（0.25），p→1 或 p→0 都趋近 0。直觉：某个类别已经 99% 确定时，再推高它的分数，概率几乎不变，对自身输入不敏感；在 0.5 的"犹豫区"最敏感。这就是"Softmax 饱和 → 梯度消失"的机制。
+
+实测验证（z = [3.0, 0.5, 0.5]，p ≈ [0.859, 0.071, 0.071]）：
+
+```text
+解析值  p1(1−p1) = 0.1211，−p1·p2 = −0.0606
+数值差分 0.1210，−0.0608（吻合）
+```
+
+两个细节：
+
+1. 同一行导数之和为 0：`Σ_j ∂p_i/∂z_j = 0`。因为所有 logit 同时加同一个常数，Softmax 输出不变（平移不变性）。
+2. `p(1−p)` 是 **Softmax 单独一层**的导数；实际中 Softmax 后面通常接交叉熵，两者合成后梯度是 `p − y`，不会消失。"饱和导致梯度消失"要放在梯度穿过 Softmax 中间量的语境下理解（如 Attention 权重乘 V 那一步）。
 ## 验收清单（全部满足才算 Day 4 完成）
 
 1. 自己能从头写出完整 Attention（`04_my_manual_attention.py` 非空、可运行）；
@@ -149,3 +230,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 ## 下一步
 
 Day 4 验收后 → 创建 `learn/day5-rmsnorm-rope` 分支，学习 RMSNorm（为什么归一化、与 LayerNorm 区别、`rms_norm_eps` 作用）和 RoPE（为什么需要、作用对象、旋转平面、`cos/sin` 形状）。
+
+
+
+

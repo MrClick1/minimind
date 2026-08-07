@@ -62,24 +62,24 @@ def main() -> None:
 
     # 2. 拆分注意力头
     query = query.view(
-        batch_size,
-        seq_len,
-        attention.n_local_heads,
-        attention.head_dim,
+        batch_size,                 # 2
+        seq_len,                    # like 6
+        attention.n_local_heads,    # 4
+        attention.head_dim,         # 32
     )
 
     key = key.view(
         batch_size,
         seq_len,
-        attention.n_local_kv_heads,
-        attention.head_dim,
+        attention.n_local_kv_heads, # 2
+        attention.head_dim,         # 32
     )
 
     value = value.view(
         batch_size,
         seq_len,
-        attention.n_local_kv_heads,
-        attention.head_dim,
+        attention.n_local_kv_heads, # 2
+        attention.head_dim,         # 32
     )
 
     print("\n拆分 Head 后：")
