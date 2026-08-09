@@ -1047,4 +1047,4 @@ git -c http.proxy= -c https.proxy= push
 
 ## 15. 当前一句话状态
 
-用户已经完成 MiniMind 的 Tiny 前向传播、整体形状追踪，以及 Attention 内部 Q/K/V、GQA、transpose、Attention Score、Causal Mask、Softmax、加权 V、合并 Head 和 `o_proj` 的跟写与初步理解；独立从零复现仍有困难，相关回看任务已记录在 `notes/day4.md`。当前开始 Day 5：RMSNorm 与 RoPE，之后再回到 Day 4 完成最终验收。
+用户已经完成 MiniMind 的 Tiny 前向传播、整体形状追踪和 Attention 主流程学习；Day 4 的独立复现任务保存在 `notes/day4.md`。Day 5 已完成 RMSNorm 的手写和源码对比，并理解 RoPE 的位置旋转、Q/K、二维配对与多频率等核心概念；RoPE 代码实践保存在 `notes/day5.md` 的延后任务中。当前开始 Day 6：MLP 与 SwiGLU，之后再回看 Day 4/Day 5 的实践验收。
