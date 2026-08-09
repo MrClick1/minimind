@@ -46,10 +46,16 @@ https://github.com/MrClick1/minimind
 https://github.com/jingyaogong/minimind
 ```
 
-本地常用路径：
+公司电脑常用路径：
 
 ```text
 C:\Users\BHJ4SZH\Desktop\Study\minimind
+```
+
+家里电脑当前路径：
+
+```text
+D:\Code\Python\agent-projects\minimind
 ```
 
 ### 2.2 Git Remote 约定
@@ -80,18 +86,17 @@ git push origin master
 
 ---
 
-## 3. 当前远程分支及作用
+## 3. 当前学习分支及作用
 
-目前已确认的远程学习分支：
+截至 2026-08-10，学习分支已经从 Day 4 继续推进到：
 
 ```text
-master
-└── learn/base
-    └── learn/day1-model-overview
-        └── learn/day2-forward-flow
-            └── learn/day3-attention
-                └── learn/day4-attention-complete
+learn/day4-attention-complete
+└── learn/day5-rmsnorm-rope
+    └── learn/day6-mlp-swiglu  ← 当前最新学习分支
 ```
+
+`learn/day5-rmsnorm-rope` 和 `learn/day6-mlp-swiglu` 最初只存在于家里电脑；本次交接文档应提交并推送到 `learn/day6-mlp-swiglu`，公司电脑接续时从该分支开始。
 
 ### 分支定位
 
@@ -102,7 +107,9 @@ master
 | `learn/day1-model-overview` | `experiments/01_tiny_forward.py` | Tiny 模型最小前向传播 |
 | `learn/day2-forward-flow` | `experiments/02_trace_forward_shapes.py` | 模型完整前向主线与形状追踪 |
 | `learn/day3-attention` | `experiments/03_trace_attention_shapes.py` | Q/K/V、GQA、transpose、Attention Score、Causal Mask |
-| `learn/day4-attention-complete` | `experiments/04_manual_attention.py`、同步后的 `handoff.md` | 当前包含最完整学习代码的分支 |
+| `learn/day4-attention-complete` | `experiments/04_manual_attention.py` | Day 4 Attention 学习与待验收实践 |
+| `learn/day5-rmsnorm-rope` | `experiments/05_manual_rmsnorm.py`、`notes/day5.md` | RMSNorm 已手写并与源码对比；RoPE 概念已学习，实践延后 |
+| `learn/day6-mlp-swiglu` | `notes/day6.md`、最新 `handoff.md` | 当前接续分支；概念学习实际已推进到 Day 9 起点 |
 
 ### 重要提醒
 
@@ -135,19 +142,10 @@ git push
 因此，当前需要接续学习时，优先从：
 
 ```text
-learn/day4-attention-complete
+learn/day6-mlp-swiglu
 ```
 
-开始，而不是从旧状态的 `learn/base` 开始。
-
-新一天建议创建：
-
-```bash
-git switch learn/day4-attention-complete
-git pull --ff-only
-git switch -c learn/day5-rmsnorm-rope
-git push -u origin learn/day5-rmsnorm-rope
-```
+开始，而不是从旧状态的 `learn/base` 或 Day 4 分支重新开始。Day7、Day8 和 Day9 当前主要是对话中的概念学习，没有新增实验代码；其进度以本文第 9、13、15 节为准。
 
 后续可以考虑新建一个长期稳定分支：
 
@@ -806,63 +804,80 @@ Q 和 K 决定“关注谁”，V 承载“需要读取的内容”。权重乘 
 
 ---
 
-## 9. 下一阶段计划
+## 9. 当前学习进度与下一步
 
-Day 4 完成后进入：
+### Day 5：RMSNorm 与 RoPE
+
+- RMSNorm 已完成手写、逐步理解和 MiniMind 源码输出对比；
+- 已理解平方均值、`eps`、`rsqrt()`、`keepdim=True`、float32 临时计算、可学习 `weight`；
+- 已理解 RoPE 作用于 Q/K、二维旋转配对、不同维度使用不同频率；
+- RoPE 手写、形状追踪和源码对照已记录在 `notes/day5.md`，暂缓实践。
+
+### Day 6：MLP / SwiGLU 与 Transformer Block
+
+- 已理解 Attention 负责 token 间信息交换，MLP 负责每个 token 内部特征变换；
+- 已理解 `gate_proj`、`up_proj`、SiLU、逐元素门控、`down_proj`；
+- 已理解 SiLU 是激活函数，SwiGLU 是包含两条投影路径和门控乘法的完整结构；
+- 已串起 `RMSNorm → Attention → 残差` 与 `RMSNorm → MLP → 残差`；
+- 用户暂时不进行新的代码实践，Day6 以概念学习为主。
+
+### Day 7：参数量计算与模型结构总结
+
+- 已掌握 Linear、RMSNorm、Attention、SwiGLU MLP 的参数量来源；
+- 已理解 GQA 使 K/V 投影维度小于 Q 投影维度；
+- 已理解 Embedding 与 LM Head 权重共享；
+- 已从 `input_ids → Embedding → Blocks → final RMSNorm → LM Head → logits` 总结完整结构；
+- 注意：教学中 `hidden_size=512` 只是举例；当前源码默认是 `hidden_size=768`、8 层、词表 6400，默认 dense 配置约 63.9M 总参数。
+
+### Day 8：Tokenizer 与 Dataset
+
+- 已理解文本、token、token ID、Embedding 的区别；
+- 已理解 ByteLevel BPE、词表大小取舍和 MiniMind 的 6400 词表；
+- 已理解 BOS、EOS、PAD，以及 PAD label 设为 `-100`；
+- 已沿 `PretrainDataset.__getitem__()` 串起 JSONL、分词、截断、填充、`input_ids` 和 `labels`；
+- 已理解 logits/labels 错开一位实现 next-token prediction；
+- 已理解 `.contiguous()` 是为切片后的 Tensor 提供连续内存布局，方便后续 `.view()`；
+- 已区分 Dataset、DataLoader、batch、step、epoch、`num_workers` 与 `pin_memory`。
+
+### Day 9：Pretrain 训练循环（当前接续点）
+
+已经学到：
 
 ```text
-Day 5：RMSNorm 与 RoPE
+前向传播 → loss → backward 计算梯度 → optimizer.step 更新参数 → zero_grad 清空梯度
 ```
 
-建议创建：
+用户已理解：
 
-```bash
-git switch learn/day4-attention-complete
-git pull --ff-only
-git switch -c learn/day5-rmsnorm-rope
-git push -u origin learn/day5-rmsnorm-rope
-```
+- `loss.backward()` 只计算并累积梯度，不直接修改参数；
+- `optimizer.step()` 才真正修改模型参数；
+- `optimizer.zero_grad(set_to_none=True)` 清理上一轮梯度。
 
-### Day 5 学习顺序
+公司电脑上的下一讲应直接从以下内容开始，不要重复 Pre-Norm、Tokenizer 或基础前向流程：
 
-先学 RMSNorm：
+1. 梯度累积为什么每个 batch 都 `backward()`，但不是每个 batch 都 `optimizer.step()`；
+2. 为什么要执行 `loss / accumulation_steps`；
+3. `autocast`、`GradScaler` 与混合精度；
+4. 梯度裁剪 `clip_grad_norm_`；
+5. AdamW、学习率调度、保存 checkpoint 与恢复训练；
+6. 最后完整串起 `trainer/train_pretrain.py`。
 
-1. 为什么需要归一化；
-2. RMSNorm 与 LayerNorm 的区别；
-3. `rms_norm_eps` 的作用；
-4. 为什么 MiniMind 使用 Pre-Norm；
-5. 手写简化 RMSNorm，并与源码输出比较。
+### 延后实践任务
 
-再学 RoPE：
-
-1. Attention 本身为什么无法感知顺序；
-2. RoPE 为什么只作用于 Q 和 K；
-3. 相邻两个维度如何组成旋转平面；
-4. `cos`、`sin` 张量的形状；
-5. `apply_rotary_pos_emb` 的输入输出形状；
-6. 先重视代码与直觉，不要求一开始完整推导复数公式。
-
-Day 5 暂时不要进入：
-
-- MoE；
-- Flash Attention 源码；
-- KV Cache 深层实现；
-- Pretrain 训练脚本；
-- SFT 数据格式。
-
-这些内容应在 RMSNorm、RoPE、MLP/SwiGLU 学完后再继续。
+- Day 4：独立复现 Attention、变化测试和概念复答，见 `notes/day4.md`；
+- Day 5：手写 RoPE、追踪广播形状并对照 `apply_rotary_pos_emb`，见 `notes/day5.md`。
 
 ---
 
 ## 10. 建议的后续路线
 
 ```text
-Day 4  完整 Attention
-Day 5  RMSNorm + RoPE
-Day 6  MLP / SwiGLU + 完整 Transformer Block
-Day 7  参数量计算 + 模型结构总结
-Day 8  Tokenizer 与 Dataset
-Day 9  Pretrain 数据流与训练循环
+Day 4  完整 Attention（概念完成，独立实践待验收）
+Day 5  RMSNorm + RoPE（RMSNorm 完成，RoPE 实践延后）
+Day 6  MLP / SwiGLU + 完整 Transformer Block（概念完成）
+Day 7  参数量计算 + 模型结构总结（完成）
+Day 8  Tokenizer 与 Dataset（完成）
+Day 9  Pretrain 数据流与训练循环（进行中：下一步是梯度累积）
 Day 10 SFT 数据格式与训练流程
 之后   KV Cache、推理生成、LoRA、DPO、MoE
 ```
@@ -962,6 +977,14 @@ git -c http.proxy= -c https.proxy= push
 | `experiments/02_trace_forward_shapes.py` | 主模型各阶段张量形状 |
 | `experiments/03_trace_attention_shapes.py` | Q/K/V、GQA、transpose、scores、mask |
 | `experiments/04_manual_attention.py` | 手工串联完整 Attention 计算 |
+| `experiments/05_manual_rmsnorm.py` | 手写 RMSNorm 并与 MiniMind 源码对比 |
+| `notes/day4.md` | Day 4 延后验收任务 |
+| `notes/day5.md` | RMSNorm/RoPE 学习结果与 RoPE 延后实践 |
+| `notes/day6.md` | MLP/SwiGLU 学习计划 |
+| `dataset/lm_dataset.py` | Pretrain、SFT、DPO 等 Dataset 实现 |
+| `trainer/train_pretrain.py` | Day 9 正在学习的预训练循环 |
+| `model/tokenizer.json` | MiniMind 的 BPE 词表与切分规则 |
+| `model/tokenizer_config.json` | 特殊 token 与聊天模板配置 |
 | `requirements.txt` | 项目依赖 |
 | `handoff.md` | 跨设备、跨模型交接文档 |
 
@@ -969,7 +992,7 @@ git -c http.proxy= -c https.proxy= push
 
 ## 13. 接手模型的操作清单
 
-接手后按以下顺序执行：
+公司电脑接手后按以下顺序执行：
 
 1. 查看当前分支和工作区：
 
@@ -978,44 +1001,49 @@ git -c http.proxy= -c https.proxy= push
    git branch --show-current
    ```
 
-2. 获取远程状态：
+2. 获取远程状态。如果再次遇到本机全局代理 `127.0.0.1:7890` 无法连接，只对当前命令临时禁用代理：
 
    ```bash
-   git fetch origin
+   git -c http.proxy= -c https.proxy= fetch origin
    git branch -vv
    ```
 
 3. 切换到当前最新学习分支：
 
    ```bash
-   git switch learn/day4-attention-complete
-   git pull --ff-only
+   git switch learn/day6-mlp-swiglu
+   git -c http.proxy= -c https.proxy= pull --ff-only
    ```
 
-4. 查看关键实验：
+   如果公司电脑上还没有该本地分支，则使用：
+
+   ```bash
+   git switch --track -c learn/day6-mlp-swiglu origin/learn/day6-mlp-swiglu
+   ```
+
+4. 确认最新交接记录：
+
+   ```bash
+   git log -3 --oneline --decorate
+   git status
+   ```
+
+5. 阅读以下文件：
 
    ```text
-   experiments/03_trace_attention_shapes.py
-   experiments/04_manual_attention.py
+   handoff.md
+   dataset/lm_dataset.py
+   trainer/train_pretrain.py
    ```
 
-5. 运行 Day 4：
-
-   ```powershell
-   uv run python .\experiments\04_manual_attention.py
-   ```
-
-6. 根据输出逐步解释完整 Attention，不要一次只给结论。
-
-7. 帮助用户完成一份简短笔记：
+6. 向接手模型明确说明：
 
    ```text
-   notes/04_complete_attention.md
+   Day8 已完成；Day9 已开始。
+   请直接从梯度累积和 loss / accumulation_steps 继续。
    ```
 
-8. 验收用户是否能独立回答第 8 节中的五个问题。
-
-9. 用户决定先进入 Day 5；Day 4 的独立复现、变化测试和概念复答已记录在 `notes/day4.md`，后续需要回来完成最终验收。
+7. 暂时不要要求用户重新手写 Attention、RoPE 或 SwiGLU；延后实践任务已经保留，等用户主动返回实践阶段。
 
 ---
 
@@ -1047,4 +1075,4 @@ git -c http.proxy= -c https.proxy= push
 
 ## 15. 当前一句话状态
 
-用户已经完成 MiniMind 的 Tiny 前向传播、整体形状追踪和 Attention 主流程学习；Day 4 的独立复现任务保存在 `notes/day4.md`。Day 5 已完成 RMSNorm 的手写和源码对比，并理解 RoPE 的位置旋转、Q/K、二维配对与多频率等核心概念；RoPE 代码实践保存在 `notes/day5.md` 的延后任务中。当前开始 Day 6：MLP 与 SwiGLU，之后再回看 Day 4/Day 5 的实践验收。
+截至 2026-08-10，用户已完成 Day6 MLP/SwiGLU、Day7 参数量与模型结构、Day8 Tokenizer/Dataset 的概念学习，并已进入 Day9 预训练循环；已经理解前向、loss、`backward()`、`optimizer.step()` 和 `zero_grad()`，公司电脑接续时直接从“梯度累积与 `loss / accumulation_steps`”开始，Day4 Attention 与 Day5 RoPE 的独立代码实践继续保留为延后任务。
