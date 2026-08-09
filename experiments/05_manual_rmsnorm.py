@@ -1,3 +1,14 @@
+import sys
+from pathlib import Path
+
+import torch
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from model.model_minimind import RMSNorm
+
 import torch
 
 
@@ -115,6 +126,37 @@ def main() -> None:
     print(my_output)
     print("my_output.shape:", my_output.shape)
     print("my_output.dtype:", my_output.dtype)
+
+    # minimind RMSNorm
+    source_rms_norm = RMSNorm(
+        dim=x.shape[-1],
+        eps=eps,
+    )
+
+    with torch.no_grad():
+        source_rms_norm.weight.copy_(
+            my_rms_norm.weight
+        )
+
+    source_output = source_rms_norm(x)
+
+    # 比较结果
+    print("\n与 MiniMind 源码比较：")
+
+    print(
+        "输出是否一致:",
+        torch.allclose(
+            my_output,
+            source_output,
+            atol=1e-6,
+        )
+    )
+
+    max_diff = (
+        my_output - source_output
+    ).abs().max()
+
+    print("最大误差:", max_diff.item())
 
 
 if __name__ == "__main__":
