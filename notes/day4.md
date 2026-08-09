@@ -1,8 +1,8 @@
 ﻿# Day 4：完整 Attention（手工串联 + 概念验收）
 
 - 对应分支：`learn/day4-attention-complete`
-- 对应实验：`experiments/04_manual_attention.py`（AI 生成，作为参考答案）；`experiments/04_my_manual_attention.py`（待自己手写，当前为空文件）
-- 状态：脚本可运行、形状全部符合预期；**自己手写一版并独立回答 5 个问题后才算验收完成**。
+- 对应实验：`experiments/04_manual_attention.py`（AI 生成，作为参考答案）；`experiments/04_my_manual_attention.py`（已跟随参考流程补齐到 `o_proj`，尚待独立修正、运行和脱稿复现）
+- 状态：参考脚本可运行、形状全部符合预期；目前已大致理解完整流程，但**独立复现和变化测试暂缓，后续回来完成后才算最终验收**。
 
 ## 要点
 
@@ -229,7 +229,17 @@ p(1−p) 在 p=0.5 时最大（0.25），p→1 或 p→0 都趋近 0。直觉：
 
 ## 下一步
 
-Day 4 验收后 → 创建 `learn/day5-rmsnorm-rope` 分支，学习 RMSNorm（为什么归一化、与 LayerNorm 区别、`rms_norm_eps` 作用）和 RoPE（为什么需要、作用对象、旋转平面、`cos/sin` 形状）。
+用户决定先进入 Day 5，在学习 RMSNorm 与 RoPE 的过程中保留以下 Day 4 回看任务：
+
+1. 先修正并独立运行 `04_my_manual_attention.py` 中遗留的类名、配置项和 K Head 形状问题；
+2. 不看实现，只写出完整 Attention 的 12 步注释骨架；
+3. 独立补出 Score、缩放、Causal Mask、Softmax 和 `Attention Weight @ V`；
+4. 每一步先预测张量形状，再运行验证；
+5. 将 `seq_len` 改为 `5`，观察所有与 `T` 有关的形状；
+6. 将 `num_key_value_heads` 改为 `1`，预测 `n_rep` 和 `repeat_kv` 前后的形状；
+7. 重新回答 5 个概念问题，重点修正 `softmax(dim=-1)` 与 `o_proj` 的表述。
+
+这些任务不阻塞 Day 5 的开始，但应在 Attention 阶段最终验收前回来完成。
 
 
 

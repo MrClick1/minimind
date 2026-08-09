@@ -15,7 +15,7 @@ from model.model_minimind import (
 )
 
 
-def main(): -> None:
+def main() -> None:
     torch.manual_seed(42)
 
     config = MiniMindConfig(
@@ -117,4 +117,54 @@ def main(): -> None:
     print("\n缩放后的注意力分数", scores.shape)
 
     # 7. 创建因果掩码
-    
+    causal_mask = torch.full(
+        (seq_len, seq_len),
+        float("-inf"),
+        device=scores.device,
+    ).triu(diagonal=1)
+
+    masked_scores = scores + causal_mask
+
+    # 8. softmax
+    attention_weights = torch.softmax(
+        masked_scores,
+        dim=-1,
+    )
+
+    print("\n注意力权重", attention_weights.shape)
+
+    # 查看第一个 Batch，第一个 Head 的注意力权重
+    print("\n第一个 Batch，第一个 Head 的注意力权重：")
+    print(attention_weights[0, 0, :, :])
+
+    print("\n每行权重之和：")
+    print(attention_weights[0, 0, :, :].sum(dim=-1))
+
+    # 9. 权重乘以 V
+    context = attention_weights @ value
+
+    print("\n加权汇总 V 后：")
+    print("context:", context.shape)
+
+    # 10. []B, H, T, D] -> [B, T, H, D]
+    context = context.transpose(1, 2)
+
+    print("\n转回后：", context.shape)
+
+    # 11. 合并多个 Head
+    context = context.contiguous().view(
+        batch_size,
+        seq_len,
+        config.num_attention_heads * attention.head_dim,
+    )
+
+    print("\n合并 Head 后：", context.shape)
+
+    # 12. 输出投影
+    output = attention.o_proj(context)
+
+    print("\n输出投影后：", output.shape)
+
+
+if __name__ == "__main__":
+    main()

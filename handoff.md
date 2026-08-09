@@ -930,6 +930,19 @@ git log --oneline learn/base..HEAD
 git diff --stat learn/base...HEAD
 ```
 
+### 本机 Git 代理说明
+
+用户级 Git 配置中保留了指向 `http://127.0.0.1:7890` 的 HTTP/HTTPS 代理，不要因为本项目的连接问题删除或修改全局代理配置。
+
+如果本项目执行 `clone`、`fetch`、`pull` 或 `push` 时出现无法连接 `127.0.0.1:7890`，只对当前 Git 命令临时禁用代理，例如：
+
+```bash
+git -c http.proxy= -c https.proxy= pull --ff-only
+git -c http.proxy= -c https.proxy= push
+```
+
+该方式只影响本次命令，不会修改用户的全局 Git 配置。
+
 ### 安全原则
 
 - 执行切换、merge、rebase 前先运行 `git status`；
@@ -1002,7 +1015,7 @@ git diff --stat learn/base...HEAD
 
 8. 验收用户是否能独立回答第 8 节中的五个问题。
 
-9. Day 4 验收后，再创建 Day 5 分支进入 RMSNorm 和 RoPE。
+9. 用户决定先进入 Day 5；Day 4 的独立复现、变化测试和概念复答已记录在 `notes/day4.md`，后续需要回来完成最终验收。
 
 ---
 
@@ -1034,4 +1047,4 @@ git diff --stat learn/base...HEAD
 
 ## 15. 当前一句话状态
 
-用户已经完成 MiniMind 的 Tiny 前向传播、整体形状追踪和 Attention 内部 Q/K/V、GQA、transpose、Attention Score、Causal Mask 学习；当前应在 `learn/day4-attention-complete` 分支运行并验收手写完整 Attention，然后进入 RMSNorm 与 RoPE。
+用户已经完成 MiniMind 的 Tiny 前向传播、整体形状追踪，以及 Attention 内部 Q/K/V、GQA、transpose、Attention Score、Causal Mask、Softmax、加权 V、合并 Head 和 `o_proj` 的跟写与初步理解；独立从零复现仍有困难，相关回看任务已记录在 `notes/day4.md`。当前开始 Day 5：RMSNorm 与 RoPE，之后再回到 Day 4 完成最终验收。
