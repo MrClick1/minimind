@@ -1,6 +1,6 @@
-# MiniMind 学习项目交接文档
+﻿# MiniMind 学习项目交接文档
 
-> 最后更新：2026-08-06  
+> 最后更新：2026-08-10  
 > 用途：供另一台主机上的本地大模型、Coding Agent 或新的对话会话快速接手当前学习进度。  
 > 使用语言：中文。
 
@@ -96,7 +96,7 @@ learn/day4-attention-complete
     └── learn/day6-mlp-swiglu  ← 当前最新学习分支
 ```
 
-`learn/day5-rmsnorm-rope` 和 `learn/day6-mlp-swiglu` 最初只存在于家里电脑；本次交接文档应提交并推送到 `learn/day6-mlp-swiglu`，公司电脑接续时从该分支开始。
+`learn/day5-rmsnorm-rope` 和 `learn/day6-mlp-swiglu` 最初只存在于家里电脑；公司电脑 2026-08-10 已接续并在 `learn/day6-mlp-swiglu` 分支上完成 Day 9~12 概念学习（见第 9 节），笔记为 `notes/day9.md` ~ `notes/day12.md`。当前接续仍从该分支开始。
 
 ### 分支定位
 
@@ -839,29 +839,38 @@ Q 和 K 决定“关注谁”，V 承载“需要读取的内容”。权重乘 
 - 已理解 `.contiguous()` 是为切片后的 Tensor 提供连续内存布局，方便后续 `.view()`；
 - 已区分 Dataset、DataLoader、batch、step、epoch、`num_workers` 与 `pin_memory`。
 
-### Day 9：Pretrain 训练循环（当前接续点）
+### Day 9：Pretrain 训练循环（已完成）
 
-已经学到：
+公司电脑上已完整学完：
 
-```text
-前向传播 → loss → backward 计算梯度 → optimizer.step 更新参数 → zero_grad 清空梯度
-```
+- 梯度累积：每个 batch 都 `backward()` 累加梯度，每 `accumulation_steps` 步才 `optimizer.step()`；`loss / accumulation_steps` 保持梯度尺度与学习率语义不变；
+- 混合精度：`autocast` 自动选择精度，`GradScaler`（仅 fp16 启用）防止梯度下溢，顺序为 `scale → backward → unscale → clip → step → update`；
+- 梯度裁剪 `clip_grad_norm_`：全局 L2 范数超阈值则等比缩放，方向不变；
+- AdamW、余弦学习率调度（衰减到 10%）、checkpoint 保存（纯权重 + resume 双文件）与断点恢复（含 optimizer/scaler 状态、world_size 换算、SkipBatchSampler）；
+- 完整串起 `trainer/train_pretrain.py` 九段流水线。
 
-用户已理解：
+### Day 10：SFT 数据格式与训练流程（已完成）
 
-- `loss.backward()` 只计算并累积梯度，不直接修改参数；
-- `optimizer.step()` 才真正修改模型参数；
-- `optimizer.zero_grad(set_to_none=True)` 清理上一轮梯度。
+- JSONL 多轮对话 + `apply_chat_template`（ChatML）；
+- label 掩码：只有 assistant 回复区间参与 loss，其余 `-100`（`generate_labels` 用 `bos_id`/`eos_id` 定位）；
+- 与预训练差异：起始权重为 pretrain、学习率 1e-5（低一个数量级）、batch 16、seq 768、accumulation 1。
 
-公司电脑上的下一讲应直接从以下内容开始，不要重复 Pre-Norm、Tokenizer 或基础前向流程：
+### Day 11：KV Cache 与推理生成（已完成）
 
-1. 梯度累积为什么每个 batch 都 `backward()`，但不是每个 batch 都 `optimizer.step()`；
-2. 为什么要执行 `loss / accumulation_steps`；
-3. `autocast`、`GradScaler` 与混合精度；
-4. 梯度裁剪 `clip_grad_norm_`；
-5. AdamW、学习率调度、保存 checkpoint 与恢复训练；
-6. 最后完整串起 `trainer/train_pretrain.py`。
+- 只缓存 K/V（未来复用），Q 用完即弃；causal mask 保证历史位置不被未来影响；
+- 源码：`torch.cat` 沿序列维拼接、`start_pos` 控制 RoPE 位置、`generate` 只喂新 token；
+- 复杂度 O(T³) → O(T²)，显存随序列线性增长（MiniMind-3 约 12KB/token）；
+- GQA（kv_heads=4）使缓存减半。
 
+### Day 12：推理采样策略（已完成）
+
+- temperature / top_k / top_p / repetition_penalty / multinomial vs argmax / eos 终止；
+- repetition_penalty：正分除、负分乘，压低已出现 token 的相对概率。
+
+### 训练计划
+
+- 公司电脑为 CPU 环境（无 CUDA），暂不训练；
+- 回家后在平台租服务器训练（参考：单卡 3090 ≈1.3￥/h，pretrain+SFT 合计约 2.3h ≈3￥）。
 ### 延后实践任务
 
 - Day 4：独立复现 Attention、变化测试和概念复答，见 `notes/day4.md`；
@@ -877,7 +886,11 @@ Day 5  RMSNorm + RoPE（RMSNorm 完成，RoPE 实践延后）
 Day 6  MLP / SwiGLU + 完整 Transformer Block（概念完成）
 Day 7  参数量计算 + 模型结构总结（完成）
 Day 8  Tokenizer 与 Dataset（完成）
-Day 9  Pretrain 数据流与训练循环（进行中：下一步是梯度累积）
+Day 9  Pretrain 数据流与训练循环（完成）
+Day 10 SFT 数据格式与训练流程（完成）
+Day 11 KV Cache 与推理生成（完成）
+Day 12 推理采样策略（完成）
+接下来 LoRA、DPO、MoE（以及延后实践：手写 RoPE、Day 4 独立复现）
 Day 10 SFT 数据格式与训练流程
 之后   KV Cache、推理生成、LoRA、DPO、MoE
 ```
@@ -981,6 +994,10 @@ git -c http.proxy= -c https.proxy= push
 | `notes/day4.md` | Day 4 延后验收任务 |
 | `notes/day5.md` | RMSNorm/RoPE 学习结果与 RoPE 延后实践 |
 | `notes/day6.md` | MLP/SwiGLU 学习计划 |
+| `notes/day9.md` | Day 9 预训练循环（梯度累积/混合精度/裁剪/AdamW/checkpoint） |
+| `notes/day10.md` | Day 10 SFT 数据格式与 label 掩码 |
+| `notes/day11.md` | Day 11 KV Cache 与推理生成 |
+| `notes/day12.md` | Day 12 推理采样策略 |
 | `dataset/lm_dataset.py` | Pretrain、SFT、DPO 等 Dataset 实现 |
 | `trainer/train_pretrain.py` | Day 9 正在学习的预训练循环 |
 | `model/tokenizer.json` | MiniMind 的 BPE 词表与切分规则 |
@@ -1039,8 +1056,8 @@ git -c http.proxy= -c https.proxy= push
 6. 向接手模型明确说明：
 
    ```text
-   Day8 已完成；Day9 已开始。
-   请直接从梯度累积和 loss / accumulation_steps 继续。
+   Day 9~12 概念学习已完成（预训练循环、SFT、KV Cache、采样策略）。
+   下一步：LoRA / DPO / MoE；延后实践：手写 RoPE、Day 4 独立复现 Attention。
    ```
 
 7. 暂时不要要求用户重新手写 Attention、RoPE 或 SwiGLU；延后实践任务已经保留，等用户主动返回实践阶段。
@@ -1075,4 +1092,5 @@ git -c http.proxy= -c https.proxy= push
 
 ## 15. 当前一句话状态
 
-截至 2026-08-10，用户已完成 Day6 MLP/SwiGLU、Day7 参数量与模型结构、Day8 Tokenizer/Dataset 的概念学习，并已进入 Day9 预训练循环；已经理解前向、loss、`backward()`、`optimizer.step()` 和 `zero_grad()`，公司电脑接续时直接从“梯度累积与 `loss / accumulation_steps`”开始，Day4 Attention 与 Day5 RoPE 的独立代码实践继续保留为延后任务。
+截至 2026-08-10，用户已完成 Day 9（预训练循环：梯度累积、混合精度、梯度裁剪、AdamW/学习率/checkpoint）、Day 10（SFT 数据与 label 掩码）、Day 11（KV Cache 与推理生成）、Day 12（采样策略）的概念学习；公司电脑为 CPU 环境暂不训练，计划回家租服务器（单卡 3090 约 3 元可跑通 pretrain+SFT）。下一步：LoRA / DPO / MoE；延后实践：Day 5 手写 RoPE、Day 4 独立复现 Attention。
+
