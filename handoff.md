@@ -96,7 +96,7 @@ learn/day4-attention-complete
     └── learn/day6-mlp-swiglu  ← 当前最新学习分支
 ```
 
-`learn/day5-rmsnorm-rope` 和 `learn/day6-mlp-swiglu` 最初只存在于家里电脑；公司电脑 2026-08-10 已接续并在 `learn/day6-mlp-swiglu` 分支上完成 Day 9~12 概念学习（见第 9 节），笔记为 `notes/day9.md` ~ `notes/day12.md`。当前接续仍从该分支开始。
+`learn/day5-rmsnorm-rope` 和 `learn/day6-mlp-swiglu` 最初只存在于家里电脑；公司电脑 2026-08-10 已接续并在 `learn/day6-mlp-swiglu` 分支上完成 Day 9~16 概念学习（见第 9 节），笔记为 `notes/day9.md` ~ `notes/day16.md`。当前接续仍从该分支开始。
 
 ### 分支定位
 
@@ -867,6 +867,29 @@ Q 和 K 决定“关注谁”，V 承载“需要读取的内容”。权重乘 
 - temperature / top_k / top_p / repetition_penalty / multinomial vs argmax / eos 终止；
 - repetition_penalty：正分除、负分乘，压低已出现 token 的相对概率。
 
+### Day 13：LoRA（参数高效微调，已完成）
+
+- 冻结原权重，只训练低秩矩阵 A、B，前向 `Wx + BAx`，初始 B=0 保证起点与基座一致；
+- MiniMind 实测：总参数 64.305M，LoRA 0.3932M（0.611%），挂在 8 层 q_proj/o_proj；
+- 训练时只有 lora 参数进优化器；推理前可 merge 回 W，无额外开销。
+
+### Day 14：DPO（直接偏好优化，已完成）
+
+- 从 Bradley-Terry 偏好模型推出闭式解，用策略/参考模型的 log 概率比代替奖励；
+- 损失 `-log σ(β·log-ratio)`：提升 chosen、压低 rejected；
+- 只需 policy + ref 两个模型，学习率极小（4e-8）防遗忘。
+
+### Day 15：RLHF / PPO 流程与原理（已完成）
+
+- 三阶段：SFT → 奖励模型（BT 损失）→ PPO；
+- PPO 四件套：actor / ref / reward / critic；rollout 采样 → 奖励 + KL 约束 → 优势估计 → clipped 更新；
+- KL 防 reward hacking；DPO 是其简化替代。
+
+### Day 16：MoE（混合专家，已完成）
+
+- 路由器 + N 个专家，每个 token 只激活 top-k（MiniMind top-1）；
+- minimind-3-moe = 198M-A64M（总 198M，每 token 激活约 64M）；
+- 负载均衡 aux_loss 防路由塌缩，训练时加入总 loss。
 ### 训练计划
 
 - 公司电脑为 CPU 环境（无 CUDA），暂不训练；
@@ -890,7 +913,11 @@ Day 9  Pretrain 数据流与训练循环（完成）
 Day 10 SFT 数据格式与训练流程（完成）
 Day 11 KV Cache 与推理生成（完成）
 Day 12 推理采样策略（完成）
-接下来 LoRA、DPO、MoE（以及延后实践：手写 RoPE、Day 4 独立复现）
+Day 13 LoRA（参数高效微调，完成）
+Day 14 DPO（直接偏好优化，完成）
+Day 15 RLHF / PPO 流程与原理（完成）
+Day 16 MoE（混合专家，完成）
+路线图主体完成；延后实践：手写 RoPE、Day 4 独立复现 Attention；实际训练：回家租服务器跑 pretrain + SFT
 Day 10 SFT 数据格式与训练流程
 之后   KV Cache、推理生成、LoRA、DPO、MoE
 ```
@@ -998,6 +1025,10 @@ git -c http.proxy= -c https.proxy= push
 | `notes/day10.md` | Day 10 SFT 数据格式与 label 掩码 |
 | `notes/day11.md` | Day 11 KV Cache 与推理生成 |
 | `notes/day12.md` | Day 12 推理采样策略 |
+| `notes/day13.md` | Day 13 LoRA 参数高效微调 |
+| `notes/day14.md` | Day 14 DPO 与 Bradley-Terry 偏好模型 |
+| `notes/day15.md` | Day 15 RLHF / PPO 流程与原理 |
+| `notes/day16.md` | Day 16 MoE 混合专家 |
 | `dataset/lm_dataset.py` | Pretrain、SFT、DPO 等 Dataset 实现 |
 | `trainer/train_pretrain.py` | Day 9 正在学习的预训练循环 |
 | `model/tokenizer.json` | MiniMind 的 BPE 词表与切分规则 |
@@ -1056,8 +1087,8 @@ git -c http.proxy= -c https.proxy= push
 6. 向接手模型明确说明：
 
    ```text
-   Day 9~12 概念学习已完成（预训练循环、SFT、KV Cache、采样策略）。
-   下一步：LoRA / DPO / MoE；延后实践：手写 RoPE、Day 4 独立复现 Attention。
+   Day 9~16 概念学习全部完成（预训练/SFT/KV Cache/采样/LoRA/DPO/RLHF/MoE）。
+   下一步：延后实践（手写 RoPE、Day 4 独立复现）+ 回家租服务器实际训练。
    ```
 
 7. 暂时不要要求用户重新手写 Attention、RoPE 或 SwiGLU；延后实践任务已经保留，等用户主动返回实践阶段。
@@ -1092,5 +1123,5 @@ git -c http.proxy= -c https.proxy= push
 
 ## 15. 当前一句话状态
 
-截至 2026-08-10，用户已完成 Day 9（预训练循环：梯度累积、混合精度、梯度裁剪、AdamW/学习率/checkpoint）、Day 10（SFT 数据与 label 掩码）、Day 11（KV Cache 与推理生成）、Day 12（采样策略）的概念学习；公司电脑为 CPU 环境暂不训练，计划回家租服务器（单卡 3090 约 3 元可跑通 pretrain+SFT）。下一步：LoRA / DPO / MoE；延后实践：Day 5 手写 RoPE、Day 4 独立复现 Attention。
+截至 2026-08-10，用户已完成 MiniMind 全路线概念学习：Day 1~8（模型结构/Tensor/Attention/RMSNorm/RoPE/MLP/参数/Tokenizer），Day 9~12（预训练循环、SFT、KV Cache、采样策略），Day 13~16（LoRA、DPO、RLHF/PPO、MoE）。公司电脑为 CPU 环境暂不训练，计划回家租服务器（单卡 3090 约 3 元可跑通 pretrain+SFT）。延后实践：Day 5 手写 RoPE、Day 4 独立复现 Attention；复习可结合 notes/day1.md ~ notes/day16.md。
 
