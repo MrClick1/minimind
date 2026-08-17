@@ -5,3 +5,6 @@ __pycache__/
 out
 website/
 docs-minimind/
+
+# Local project preparation notes
+/notes/minimind项目准备笔记.md
